@@ -1,101 +1,71 @@
-'use client'
+import { notFound } from 'next/navigation';
+import { getPoll } from '@/lib/actions/poll-actions';
+import VoteForm from './vote-form';
 
-import { useState } from 'react'
-import { Button } from '@/app/components/ui/button'
-
-// Mock data for a single poll
-const mockPoll = {
-  id: '1',
-  title: 'Favorite Programming Language',
-  description: 'What is your favorite programming language?',
-  options: ['JavaScript', 'Python', 'Java', 'C#', 'Go'],
-  votes: [120, 80, 60, 40, 30],
-  createdBy: 'John Doe',
-  createdAt: '2023-05-15',
-}
-
-export default function PollDetailPage({ params }: { params: { id: string } }) {
-  const [selectedOption, setSelectedOption] = useState<number | null>(null)
-  const [hasVoted, setHasVoted] = useState(false)
-
-  const totalVotes = mockPoll.votes.reduce((sum, current) => sum + current, 0)
-
-  const handleVote = () => {
-    if (selectedOption !== null) {
-      // In a real app, this would send the vote to an API
-      console.log(`Voted for option: ${mockPoll.options[selectedOption]}`)
-      setHasVoted(true)
-    }
+export default async function PollDetailPage({ params }: { params: { id: string } }) {
+  const { success, poll, options, results, creator, error } = await getPoll(params.id);
+  
+  if (!success || !poll) {
+    return notFound();
   }
 
+  // Calculate total votes
+  const totalVotes = results.reduce((sum, result) => sum + result.vote_count, 0);
+
   return (
-    <div className="container mx-auto py-8">
-      <div className="mx-auto max-w-2xl rounded-lg border p-6 shadow-md">
-        <h1 className="mb-2 text-2xl font-bold">{mockPoll.title}</h1>
-        <p className="mb-6 text-gray-600">{mockPoll.description}</p>
-
-        <div className="mb-4">
-          <p className="text-sm text-gray-500">
-            Created by {mockPoll.createdBy} on {mockPoll.createdAt}
-          </p>
-        </div>
-
-        <div className="mb-6 space-y-4">
-          {mockPoll.options.map((option, index) => (
-            <div key={index} className="rounded-lg border p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  {!hasVoted ? (
-                    <input
-                      type="radio"
-                      id={`option-${index}`}
-                      name="poll-option"
-                      className="mr-3 h-4 w-4"
-                      checked={selectedOption === index}
-                      onChange={() => setSelectedOption(index)}
-                    />
-                  ) : null}
-                  <label
-                    htmlFor={`option-${index}`}
-                    className={`${hasVoted ? 'font-medium' : ''}`}
-                  >
-                    {option}
-                  </label>
-                </div>
-                {hasVoted && (
-                  <span className="text-sm font-medium">
-                    {mockPoll.votes[index]} votes ({((mockPoll.votes[index] / totalVotes) * 100).toFixed(1)}%)
-                  </span>
-                )}
-              </div>
-              {hasVoted && (
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                  <div
-                    className="h-full bg-blue-500"
-                    style={{ width: `${(mockPoll.votes[index] / totalVotes) * 100}%` }}
-                  ></div>
-                </div>
-              )}
+    <div className="container mx-auto py-8 px-4">
+      <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="p-6">
+          <h1 className="text-2xl font-bold mb-2">{poll.title}</h1>
+          {poll.description && (
+            <p className="text-gray-600 mb-6">{poll.description}</p>
+          )}
+          
+          <div className="mb-6">
+            <div className="flex items-center text-sm text-gray-500 mb-2">
+              <span>Created by {creator.display_name || creator.username}</span>
+              <span className="mx-2">•</span>
+              <span>{new Date(poll.created_at).toLocaleDateString()}</span>
             </div>
-          ))}
-        </div>
-
-        {!hasVoted ? (
-          <Button
-            onClick={handleVote}
-            disabled={selectedOption === null}
-            className="w-full"
-          >
-            Submit Vote
-          </Button>
-        ) : (
-          <div className="text-center">
-            <p className="mb-4 text-lg font-medium">Thank you for voting!</p>
-            <p className="text-sm text-gray-600">
-              Total votes: {totalVotes}
-            </p>
+            
+            {poll.expires_at && (
+              <div className="text-sm text-amber-600">
+                Expires: {new Date(poll.expires_at).toLocaleString()}
+              </div>
+            )}
           </div>
-        )}
+
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-4">Results</h2>
+            {results.map((result) => {
+              const percentage = totalVotes > 0 
+                ? Math.round((result.vote_count / totalVotes) * 100) 
+                : 0;
+              
+              return (
+                <div key={result.option_id} className="mb-3">
+                  <div className="flex justify-between mb-1">
+                    <span>{result.option_text}</span>
+                    <span className="text-gray-600">
+                      {result.vote_count} vote{result.vote_count !== 1 ? 's' : ''} ({percentage}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full" 
+                      style={{ width: `${percentage}%` }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="text-sm text-gray-500 mt-2">
+              Total votes: {totalVotes}
+            </div>
+          </div>
+
+          <VoteForm pollId={poll.id} options={options} allowMultiple={poll.allow_multiple_votes} />
+        </div>
       </div>
     </div>
   )

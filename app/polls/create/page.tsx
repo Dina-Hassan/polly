@@ -3,11 +3,18 @@
 import { useState } from 'react'
 import { Button } from '@/app/components/ui/button'
 import Link from 'next/link'
+import { createPoll } from '@/lib/actions/poll-actions'
+import { useRouter } from 'next/navigation'
 
 export default function CreatePollPage() {
+  const router = useRouter()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [options, setOptions] = useState(['', ''])
+  const [isPublic, setIsPublic] = useState(true)
+  const [allowMultipleVotes, setAllowMultipleVotes] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleAddOption = () => {
     setOptions([...options, ''])
@@ -26,12 +33,37 @@ export default function CreatePollPage() {
     setOptions(newOptions)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would send the poll data to an API
-    console.log('Creating poll:', { title, description, options })
-    // Redirect to polls page after creation
-    window.location.href = '/polls'
+    setIsSubmitting(true)
+    setError(null)
+    
+    try {
+      // Filter out empty options
+      const validOptions = options.filter(opt => opt.trim() !== '')
+      
+      if (validOptions.length < 2) {
+        throw new Error('Please provide at least 2 valid options')
+      }
+      
+      const result = await createPoll(
+        title,
+        description || null,
+        validOptions,
+        isPublic,
+        allowMultipleVotes
+      )
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create poll')
+      }
+      
+      // Redirect to the new poll
+      router.push(`/polls/${result.pollId}`)
+    } catch (err) {
+      setError((err as Error).message)
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -44,6 +76,12 @@ export default function CreatePollPage() {
           </Link>
         </div>
 
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-md">
+            {error}
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-6 rounded-lg border p-6 shadow-md">
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-gray-700">
@@ -72,6 +110,34 @@ export default function CreatePollPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
+          </div>
+          
+          <div className="flex space-x-6">
+            <div className="flex items-center">
+              <input
+                id="isPublic"
+                type="checkbox"
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+              />
+              <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-700">
+                Public poll (anyone can view)
+              </label>
+            </div>
+            
+            <div className="flex items-center">
+              <input
+                id="allowMultipleVotes"
+                type="checkbox"
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                checked={allowMultipleVotes}
+                onChange={(e) => setAllowMultipleVotes(e.target.checked)}
+              />
+              <label htmlFor="allowMultipleVotes" className="ml-2 block text-sm text-gray-700">
+                Allow multiple votes per option
+              </label>
+            </div>
           </div>
 
           <div>
@@ -111,8 +177,12 @@ export default function CreatePollPage() {
             </button>
           </div>
 
-          <Button type="submit" className="w-full">
-            Create Poll
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Creating Poll...' : 'Create Poll'}
           </Button>
         </form>
       </div>
