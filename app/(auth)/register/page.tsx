@@ -2,17 +2,34 @@
 
 import { useState } from 'react'
 import { Button } from '@/app/components/ui/button'
+import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 export default function RegisterPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Registration logic will be implemented here
-    console.log('Registration attempt with:', { name, email, password })
+    setError(null)
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    try {
+      const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } })
+      if (error) {
+        setError(error.message)
+      } else {
+        router.push('/polls')
+      }
+    } catch (error) {
+      setError('An unexpected error occurred.')
+    }
   }
 
   return (
@@ -23,6 +40,7 @@ export default function RegisterPage() {
           <p className="mt-2 text-sm text-gray-600">Sign up to start creating polls</p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && <p className="text-red-500">{error}</p>}
           <div className="space-y-4 rounded-md shadow-sm">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">

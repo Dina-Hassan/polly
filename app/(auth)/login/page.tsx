@@ -2,15 +2,28 @@
 
 import { useState } from 'react'
 import { Button } from '@/app/components/ui/button'
+import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Authentication logic will be implemented here
-    console.log('Login attempt with:', { email, password })
+    setError(null)
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setError(error.message)
+      } else {
+        router.push('/polls')
+      }
+    } catch (error) {
+      setError('An unexpected error occurred.')
+    }
   }
 
   return (
@@ -21,6 +34,7 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-gray-600">Enter your credentials to access your account</p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && <p className="text-red-500">{error}</p>}
           <div className="space-y-4 rounded-md shadow-sm">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
